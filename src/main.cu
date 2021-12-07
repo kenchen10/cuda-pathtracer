@@ -9,6 +9,7 @@
 #include "hitable_list.h"
 #include "camera.h"
 #include "sampler.h"
+#include "bsdf.h"
 
 // limited version of checkCudaErrors from helper_cuda.h in CUDA examples
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
@@ -33,9 +34,9 @@ __device__ vec3 color(const ray& r, hitable **world, curandState *local_rand_sta
    for(int i = 0; i < 50; i++) {
       hit_record rec;
       if ((*world)->hit(cur_ray, 0.001f, FLT_MAX, rec)) {
-        //  vec3 target = rec.p + rec.normal + sampler.get_sample(local_rand_state);
-        vec3 target = cur_ray.direction() - 2.f * dot(cur_ray.direction(), rec.normal) * rec.normal;
-        cur_attenuation *= 1.0f;
+         vec3 target = rec.p + rec.normal + sampler.get_sample(local_rand_state);
+        // vec3 target = cur_ray.direction() - 2.f * dot(cur_ray.direction(), rec.normal) * rec.normal;
+        cur_attenuation *= 1.0f / 3.1415;
         cur_ray = ray(rec.p, target-rec.p);
       }
       else {
