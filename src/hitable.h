@@ -2,12 +2,14 @@
 #define HITABLEH
 
 #include "ray.h"
+#include "bsdf.h"
 
 struct hit_record
 {
     float t;
     vec3 p;
     vec3 normal;
+    bsdf *BSDF;
 };
 
 class hitable  {

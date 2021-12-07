@@ -5,11 +5,13 @@
 #include <math_constants.h>
 #include "vec3.h"
 #include "ray.h"
+#include "bsdf.h"
 #include "sphere.h"
+#include "hitable.h"
 #include "hitable_list.h"
 #include "camera.h"
 #include "sampler.h"
-#include "bsdf.h"
+
 
 // limited version of checkCudaErrors from helper_cuda.h in CUDA examples
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
@@ -26,7 +28,7 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
 
 __device__ vec3 color(const ray& r, hitable **world, curandState *local_rand_state) {
    ray cur_ray = r;
-   float cur_attenuation = 1.0f;
+   vec3 cur_attenuation = vec3(1.0f, 1.0f, 1.0f);
    unit_sphere_sampler sampler;
    // Temporary variables
    vec3 reflectance = vec3(1., 1., 1.);
@@ -34,9 +36,11 @@ __device__ vec3 color(const ray& r, hitable **world, curandState *local_rand_sta
    for(int i = 0; i < 50; i++) {
       hit_record rec;
       if ((*world)->hit(cur_ray, 0.001f, FLT_MAX, rec)) {
-         vec3 target = rec.p + rec.normal + sampler.get_sample(local_rand_state);
+        vec3 target;
+        double pdf;
+        vec3 f = rec.BSDF->evaluate(r.direction(), &target, rec.p, rec.normal, &pdf, local_rand_state);
         // vec3 target = cur_ray.direction() - 2.f * dot(cur_ray.direction(), rec.normal) * rec.normal;
-        cur_attenuation *= 1.0f / 3.1415;
+        cur_attenuation *= f;
         cur_ray = ray(rec.p, target-rec.p);
       }
       else {
@@ -75,9 +79,11 @@ __global__ void render(vec3 *fb, int max_x, int max_y, int ns, camera **cam, hit
 }
 
 __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_camera) {
+    diffuse *red = new diffuse(vec3(1.f, 0.f, 0.f));
+    diffuse *green = new diffuse(vec3(0.f, 1.f, 0.f));
     if (threadIdx.x == 0 && blockIdx.x == 0) {
-        *(d_list)   = new sphere(vec3(0,0,-1), 0.5);
-        *(d_list+1) = new sphere(vec3(0,-100.5,-1), 100);
+        *(d_list)   = new sphere(vec3(0,0,-1), 0.5, green);
+        *(d_list+1) = new sphere(vec3(0,-100.5,-1), 100, red);
         *d_world    = new hitable_list(d_list,2);
         *d_camera   = new camera();
     }
