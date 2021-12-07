@@ -30,4 +30,25 @@ __device__ vec3 diffuse::evaluate(const vec3 wo, vec3 *wi, vec3 p, vec3 n, doubl
     return f(wo, *wi);
 }
 
+class mirror : public bsdf {
+    public:
+        __device__ mirror(const vec3 r): attenuation(r) {}
+        __device__ virtual vec3 f(const vec3 wo, const vec3 wi);
+        __device__ virtual vec3 evaluate(const vec3 wo, vec3 *wi, vec3 p, vec3 n, double *pdf, curandState *local_rand_state);
+        __device__ virtual vec3 emission(vec3 wo) const { return vec3(0.f, 0.f, 0.f); };
+    
+    private:
+        vec3 attenuation;
+        unit_sphere_sampler sampler;
+};
+
+__device__ vec3 mirror::f(const vec3 wo, const vec3 wi) {
+    return vec3(1.f, 1.f, 1.f);
+}
+
+__device__ vec3 mirror::evaluate(const vec3 wo, vec3 *wi, vec3 p, vec3 n, double *pdf, curandState *local_rand_state) {
+    *wi = wo - 2.f * dot(wo, n) * n;
+    return attenuation;
+}
+
 #endif

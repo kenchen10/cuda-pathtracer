@@ -80,11 +80,16 @@ __global__ void render(vec3 *fb, int max_x, int max_y, int ns, camera **cam, hit
 
 __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_camera) {
     diffuse *red = new diffuse(vec3(1.f, 0.f, 0.f));
+    mirror *m = new mirror(vec3(1.f, 1.f, 1.f));
     diffuse *green = new diffuse(vec3(0.f, 1.f, 0.f));
+    diffuse *blue = new diffuse(vec3(0.f, 0.f, 1.f));
     if (threadIdx.x == 0 && blockIdx.x == 0) {
-        *(d_list)   = new sphere(vec3(0,0,-1), 0.5, green);
-        *(d_list+1) = new sphere(vec3(0,-100.5,-1), 100, red);
-        *d_world    = new hitable_list(d_list,2);
+        *(d_list)   = new sphere(vec3(0,0,-1), 0.3, m);
+        *(d_list+1)   = new sphere(vec3(-1,0,-1), 0.1, green);
+        *(d_list+2)   = new sphere(vec3(.4,0,-.6), 0.2, blue);
+        *(d_list+3)   = new sphere(vec3(.3,0,-1), 0.05, green);
+        *(d_list+4) = new sphere(vec3(0,-100.5,-1), 100, red);
+        *d_world    = new hitable_list(d_list,5);
         *d_camera   = new camera();
     }
 }
@@ -99,7 +104,7 @@ __global__ void free_world(hitable **d_list, hitable **d_world, camera **d_camer
 int main() {
     int nx = 1200;
     int ny = 600;
-    int ns = 100;
+    int ns = 50;
     int tx = 8;
     int ty = 8;
 
