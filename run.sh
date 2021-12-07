@@ -1,0 +1,1 @@
+./build/main > output/image.ppm
