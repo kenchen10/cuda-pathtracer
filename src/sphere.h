@@ -25,7 +25,7 @@ __device__ bool sphere::hit(const ray& r, float t_min, float t_max, hit_record& 
         if (temp < t_max && temp > t_min) {
             rec.t = temp;
             rec.p = r.at(rec.t);
-            rec.normal = (rec.p - center) / radius;
+            rec.normal = unit_vector((rec.p - center) / radius);
             rec.BSDF = BSDF;
             return true;
         }
@@ -33,7 +33,7 @@ __device__ bool sphere::hit(const ray& r, float t_min, float t_max, hit_record& 
         if (temp < t_max && temp > t_min) {
             rec.t = temp;
             rec.p = r.at(rec.t);
-            rec.normal = (rec.p - center) / radius;
+            rec.normal = unit_vector((rec.p - center) / radius);
             rec.BSDF = BSDF;
             return true;
         }

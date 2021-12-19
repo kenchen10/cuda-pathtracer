@@ -11,7 +11,7 @@
 #include "hitable_list.h"
 #include "camera.h"
 #include "sampler.h"
-
+#include "light.h"
 
 // limited version of checkCudaErrors from helper_cuda.h in CUDA examples
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
@@ -26,7 +26,7 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
     }
 }
 
-__device__ vec3 color(const ray& r, hitable **world, curandState *local_rand_state) {
+__device__ vec3 global_illumination(const ray& r, hitable **world, curandState *local_rand_state) {
    ray cur_ray = r;
    vec3 cur_attenuation = vec3(1.0f, 1.0f, 1.0f);
    unit_sphere_sampler sampler;
@@ -44,10 +44,21 @@ __device__ vec3 color(const ray& r, hitable **world, curandState *local_rand_sta
         cur_ray = ray(rec.p, target-rec.p);
       }
       else {
-           vec3 unit_direction = unit_vector(cur_ray.direction());
-           float t = 0.5f*(unit_direction.y() + 1.0f);
-           vec3 c = (1.0f-t)*vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
-           return cur_attenuation * c;
+            vec3 unit_direction = unit_vector(cur_ray.direction());
+            point_light pt_l = point_light(vec3(1., 1., 1.), vec3(0., 1., 0.));
+            vec3 light_dir;
+            double light_dist;
+            double pdf;
+            vec3 wi;
+            vec3 light_radiance = pt_l.sample_light(rec.p, &light_dir, &light_dist, &pdf);
+            ray shadow_ray = ray(rec.p, light_dir);
+            // vec3 f = rec.BSDF->evaluate(cur_ray.direction(), &wi, new_rec.p, new_rec.normal, &pdf, local_rand_state);
+            // cur_attenuation *= f;
+            if (!(*world)->hit(shadow_ray, 0.001f, FLT_MAX, rec)) {
+                double cos = abs(light_dir.z());
+                return cur_attenuation * light_radiance;
+            }
+        //    return cur_attenuation * c;
         }
       }
    return vec3(0.0,0.0,0.0); // exceeded recursion
@@ -62,24 +73,27 @@ __global__ void render_init(int max_x, int max_y, curandState *rand_state) {
     curand_init(1984, pixel_index, 0, &rand_state[pixel_index]);
 }
 
-__global__ void render(vec3 *fb, int max_x, int max_y, int ns, camera **cam, hitable **world, curandState *rand_state) {
+__global__ void render(vec3 *fb, int max_x, int max_y, int ns, int max_depth, camera **cam, hitable **world, curandState *rand_state) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
     if((i >= max_x) || (j >= max_y)) return;
     int pixel_index = j*max_x + i;
     curandState local_rand_state = rand_state[pixel_index];
+    hit_record rec;
     vec3 col(0,0,0);
     for(int s=0; s < ns; s++) {
         float u = float(i + curand_uniform(&local_rand_state)) / float(max_x);
         float v = float(j + curand_uniform(&local_rand_state)) / float(max_y);
         ray r = (*cam)->get_ray(u,v);
-        col += color(r, world, &local_rand_state);
+        r.depth = max_depth;
+        col += global_illumination(r, world, &local_rand_state);
     }
     fb[pixel_index] = col/float(ns);
 }
 
 __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_camera) {
     diffuse *red = new diffuse(vec3(1.f, 0.f, 0.f));
+    emissive *e = new emissive(vec3(1., 1., 1.), vec3(0., 0., 0.));
     mirror *m = new mirror(vec3(1.f, 1.f, 1.f));
     diffuse *green = new diffuse(vec3(0.f, 1.f, 0.f));
     diffuse *blue = new diffuse(vec3(0.f, 0.f, 1.f));
@@ -87,7 +101,7 @@ __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_cam
         *(d_list)   = new sphere(vec3(0,0,-1), 0.3, m);
         *(d_list+1)   = new sphere(vec3(-1,0,-1), 0.1, green);
         *(d_list+2)   = new sphere(vec3(.4,0,-.6), 0.2, blue);
-        *(d_list+3)   = new sphere(vec3(.3,0,-1), 0.05, green);
+        *(d_list+3)   = new sphere(vec3(.2,0,-1), 0.1, green);
         *(d_list+4) = new sphere(vec3(0,-100.5,-1), 100, red);
         *d_world    = new hitable_list(d_list,5);
         *d_camera   = new camera();
@@ -97,6 +111,9 @@ __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_cam
 __global__ void free_world(hitable **d_list, hitable **d_world, camera **d_camera) {
     delete *(d_list);
     delete *(d_list+1);
+    delete *(d_list+2);
+    delete *(d_list+3);
+    delete *(d_list+4);
     delete *d_world;
     delete *d_camera;
 }
@@ -104,9 +121,10 @@ __global__ void free_world(hitable **d_list, hitable **d_world, camera **d_camer
 int main() {
     int nx = 1200;
     int ny = 600;
-    int ns = 50;
+    int ns = 10;
     int tx = 8;
     int ty = 8;
+    int max_depth = 15;
 
     std::cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";
     std::cerr << "in " << tx << "x" << ty << " blocks.\n";
@@ -141,7 +159,7 @@ int main() {
     render_init<<<blocks, threads>>>(nx, ny, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
-    render<<<blocks, threads>>>(fb, nx, ny,  ns, d_camera, d_world, d_rand_state);
+    render<<<blocks, threads>>>(fb, nx, ny,  ns, max_depth, d_camera, d_world, d_rand_state);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
     stop = clock();

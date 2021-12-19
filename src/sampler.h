@@ -21,7 +21,7 @@ __device__ vec3 unit_sphere_sampler::get_sample(curandState *local_rand_state) c
     do {
         p = 2.0f*RANDVEC3 - vec3(1,1,1);
     } while (p.squared_length() >= 1.0f);
-    return p;
+    return unit_vector(p);
 }
 
 #endif
