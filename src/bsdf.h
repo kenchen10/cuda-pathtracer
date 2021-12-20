@@ -48,7 +48,7 @@ __device__ vec3 mirror::f(const vec3 wo, const vec3 wi) {
 }
 
 __device__ vec3 mirror::evaluate(const vec3 wo, vec3 *wi, vec3 p, vec3 n, double *pdf, curandState *local_rand_state) {
-    *wi = wo - 2.f * dot(wo, n) * n;
+    *wi = reflect(wo, n);
     *pdf = 1.;
     return attenuation;
 }

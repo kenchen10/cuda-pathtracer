@@ -12,6 +12,8 @@
 #include "camera.h"
 #include "sampler.h"
 #include "light.h"
+#include "triangle.h"
+#include "utils/OBJ_Loader.h"
 
 // limited version of checkCudaErrors from helper_cuda.h in CUDA examples
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
@@ -30,35 +32,35 @@ __device__ vec3 global_illumination(const ray& r, hitable **world, curandState *
    ray cur_ray = r;
    vec3 cur_attenuation = vec3(1.0f, 1.0f, 1.0f);
    unit_sphere_sampler sampler;
-   // Temporary variables
    vec3 reflectance = vec3(1., 1., 1.);
    vec3 f = reflectance / CUDART_PI_F;
-   for(int i = 0; i < 50; i++) {
+   for(int i = 0; i < r.depth; i++) {
       hit_record rec;
       if ((*world)->hit(cur_ray, 0.001f, FLT_MAX, rec)) {
         vec3 target;
         double pdf;
         vec3 f = rec.BSDF->evaluate(r.direction(), &target, rec.p, rec.normal, &pdf, local_rand_state);
-        // vec3 target = cur_ray.direction() - 2.f * dot(cur_ray.direction(), rec.normal) * rec.normal;
         cur_attenuation *= f;
         cur_ray = ray(rec.p, target-rec.p);
       }
       else {
-            vec3 unit_direction = unit_vector(cur_ray.direction());
-            point_light pt_l = point_light(vec3(1., 1., 1.), vec3(0., 1., 0.));
-            vec3 light_dir;
-            double light_dist;
-            double pdf;
-            vec3 wi;
-            vec3 light_radiance = pt_l.sample_light(rec.p, &light_dir, &light_dist, &pdf);
-            ray shadow_ray = ray(rec.p, light_dir);
-            // vec3 f = rec.BSDF->evaluate(cur_ray.direction(), &wi, new_rec.p, new_rec.normal, &pdf, local_rand_state);
-            // cur_attenuation *= f;
-            if (!(*world)->hit(shadow_ray, 0.001f, FLT_MAX, rec)) {
-                double cos = abs(light_dir.z());
-                return cur_attenuation * light_radiance;
+            if (i > 0) {
+                vec3 unit_direction = unit_vector(cur_ray.direction());
+                point_light pt_l = point_light(vec3(1., 1., 1.), vec3(0., 1., 0.));
+                vec3 light_dir;
+                double light_dist;
+                double pdf;
+                vec3 wi;
+                vec3 light_radiance = pt_l.sample_light(rec.p, &light_dir, &light_dist, &pdf);
+                ray shadow_ray = ray(rec.p, light_dir);
+                if (!(*world)->hit(shadow_ray, 0.001f, FLT_MAX, rec)) {
+                    double cos = abs(light_dir.z());
+                    return cur_attenuation * light_radiance;
+                }
             }
-        //    return cur_attenuation * c;
+            else {
+                return vec3(0., 0., 0.);
+            }
         }
       }
    return vec3(0.0,0.0,0.0); // exceeded recursion
@@ -97,14 +99,26 @@ __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_cam
     mirror *m = new mirror(vec3(1.f, 1.f, 1.f));
     diffuse *green = new diffuse(vec3(0.f, 1.f, 0.f));
     diffuse *blue = new diffuse(vec3(0.f, 0.f, 1.f));
+    diffuse *yellow = new diffuse(vec3(1.f, 1.f, 0.f));
+    diffuse *p = new diffuse(vec3(1.f, 0.f, 1.f));
+    // Image
+    auto aspect_ratio = 16.0 / 9.0;
+    int image_width = 400;
+    vec3 lookfrom(0,-.2,5);
+    vec3 lookat(0,0,0);
+    vec3 vup(0,1,0);
+    auto dist_to_focus = 10.0;
+    auto aperture = 0.1;
+    int image_height = static_cast<int>(image_width / aspect_ratio);
     if (threadIdx.x == 0 && blockIdx.x == 0) {
         *(d_list)   = new sphere(vec3(0,0,-1), 0.3, m);
         *(d_list+1)   = new sphere(vec3(-1,0,-1), 0.1, green);
-        *(d_list+2)   = new sphere(vec3(.4,0,-.6), 0.2, blue);
-        *(d_list+3)   = new sphere(vec3(.2,0,-1), 0.1, green);
-        *(d_list+4) = new sphere(vec3(0,-100.5,-1), 100, red);
-        *d_world    = new hitable_list(d_list,5);
-        *d_camera   = new camera();
+        *(d_list+2)   = new sphere(vec3(.5,0,-.6), 0.2, blue);
+        *(d_list+3)   = new sphere(vec3(-.6,0,-1), 0.23, yellow);
+        *(d_list+4) = new sphere(vec3(0,-10.5,-1), 10, p);
+        *(d_list+5) = new triangle(vec3(0,-.6,-3), vec3(0, 3, -3), vec3(1, -.5, -3), m);
+        *d_world    = new hitable_list(d_list,6);
+        *d_camera   = new camera(lookfrom, lookat, vup, 20, aspect_ratio, aperture, dist_to_focus, 0.0, 1.0);
     }
 }
 
@@ -114,11 +128,14 @@ __global__ void free_world(hitable **d_list, hitable **d_world, camera **d_camer
     delete *(d_list+2);
     delete *(d_list+3);
     delete *(d_list+4);
+    delete *(d_list+5);
     delete *d_world;
     delete *d_camera;
 }
 
 int main() {
+    objl::Loader loader;
+    loader.LoadFile("../meshes/obj/bunny.obj");
     int nx = 1200;
     int ny = 600;
     int ns = 10;
@@ -142,7 +159,7 @@ int main() {
 
     // make our world of hitables & the camera
     hitable **d_list;
-    checkCudaErrors(cudaMalloc((void **)&d_list, 2*sizeof(hitable *)));
+    checkCudaErrors(cudaMalloc((void **)&d_list, 6*sizeof(hitable *)));
     hitable **d_world;
     checkCudaErrors(cudaMalloc((void **)&d_world, sizeof(hitable *)));
     camera **d_camera;

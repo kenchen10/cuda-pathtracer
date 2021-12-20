@@ -142,4 +142,8 @@ __host__ __device__ inline vec3 unit_vector(vec3 v) {
     return v / v.length();
 }
 
+__host__ __device__ inline vec3 reflect(vec3 wo, vec3 n) {
+    return wo - 2.f * dot(wo, n) * n;
+}
+
 #endif
