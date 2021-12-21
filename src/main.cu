@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <time.h>
 #include <float.h>
 #include <curand_kernel.h>
@@ -45,8 +46,11 @@ __device__ vec3 global_illumination(const ray& r, hitable **world, curandState *
       }
       else {
             if (i > 0) {
+                if (i == 1 && rec.BSDF->reflective()) {
+                    return vec3(0., 0., 0.);
+                }
                 vec3 unit_direction = unit_vector(cur_ray.direction());
-                point_light pt_l = point_light(vec3(1., 1., 1.), vec3(0., 1., 0.));
+                point_light pt_l = point_light(vec3(1., 1., 1.), vec3(0., .8, 0));
                 vec3 light_dir;
                 double light_dist;
                 double pdf;
@@ -100,24 +104,37 @@ __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_cam
     diffuse *green = new diffuse(vec3(0.f, 1.f, 0.f));
     diffuse *blue = new diffuse(vec3(0.f, 0.f, 1.f));
     diffuse *yellow = new diffuse(vec3(1.f, 1.f, 0.f));
-    diffuse *p = new diffuse(vec3(1.f, 0.f, 1.f));
+    diffuse *white = new diffuse(vec3(1.f, 1.f, 1.f));
+    diffuse *p = new diffuse(vec3(1.f, 0.f, 1.f) * 2.);
     // Image
     auto aspect_ratio = 16.0 / 9.0;
     int image_width = 400;
-    vec3 lookfrom(0,-.2,5);
+    vec3 lookfrom(0,0,5);
     vec3 lookat(0,0,0);
     vec3 vup(0,1,0);
     auto dist_to_focus = 10.0;
     auto aperture = 0.1;
     int image_height = static_cast<int>(image_width / aspect_ratio);
     if (threadIdx.x == 0 && blockIdx.x == 0) {
-        *(d_list)   = new sphere(vec3(0,0,-1), 0.3, m);
-        *(d_list+1)   = new sphere(vec3(-1,0,-1), 0.1, green);
-        *(d_list+2)   = new sphere(vec3(.5,0,-.6), 0.2, blue);
-        *(d_list+3)   = new sphere(vec3(-.6,0,-1), 0.23, yellow);
-        *(d_list+4) = new sphere(vec3(0,-10.5,-1), 10, p);
-        *(d_list+5) = new triangle(vec3(0,-.6,-3), vec3(0, 3, -3), vec3(1, -.5, -3), m);
-        *d_world    = new hitable_list(d_list,6);
+        *(d_list+0)   = new sphere(vec3(0,-.6,-.5), 0.3, m);
+        *(d_list+1) = new sphere(vec3(0,0,-.5), 0.1, green);
+        *(d_list+2) = new sphere(vec3(.5,-.6,-.5), 0.2, blue);
+        *(d_list+3) = new sphere(vec3(-.6,-.6,-.5), 0.23, yellow);
+        // *(d_list+4) = new sphere(vec3(0,-10.5,-1), 10, p);
+        // *(d_list+5) = new triangle(vec3(0,-.6,-3), vec3(0, 3, -3), vec3(1, -.5, -3), m);
+        *(d_list+4) = new triangle(vec3(-1,-1,-3), vec3(-1, 1, -3), vec3(1, 1, -3), white);
+        *(d_list+5) = new triangle(vec3(1, 1, -3), vec3(-1,-1,-3), vec3(1, -1, -3), white);
+        // *(d_list+6) = new triangle(vec3(-1,1,-3), vec3(1, 1, -3), vec3(1, 1, 0), white);
+        // *(d_list+7) = new triangle(vec3(-1,1,-3), vec3(-1, 1, 0), vec3(1, 1, 0), white);
+        *(d_list+6) = new triangle(vec3(-1,-1,-3), vec3(1, -1, -3), vec3(1, -1, 0), white);
+        *(d_list+7) = new triangle(vec3(-1,-1,-3), vec3(-1, -1, 0), vec3(1, -1, 0), white);
+        *(d_list+8) = new triangle(vec3(-1,-1,-3), vec3(-1, 1, -3), vec3(-1, 1, 0), white);
+        *(d_list+9) = new triangle(vec3(-1,-1,-3), vec3(-1, -1, 0), vec3(-1, 1, 0), white);
+        *(d_list+10) = new triangle(vec3(1,-1,-3), vec3(1, 1, -3), vec3(1, 1, 0), white);
+        *(d_list+11) = new triangle(vec3(1,-1,-3), vec3(1, -1, 0), vec3(1, 1, 0), white);
+        *(d_list+12) = new triangle(vec3(-1,1,-3), vec3(1, 1, -3), vec3(1, 1, 0), white);
+        *(d_list+13) = new triangle(vec3(-1,1,-3), vec3(-1, 1, 0), vec3(1, 1, 0), white);
+        *d_world    = new hitable_list(d_list,14);
         *d_camera   = new camera(lookfrom, lookat, vup, 20, aspect_ratio, aperture, dist_to_focus, 0.0, 1.0);
     }
 }
@@ -129,16 +146,107 @@ __global__ void free_world(hitable **d_list, hitable **d_world, camera **d_camer
     delete *(d_list+3);
     delete *(d_list+4);
     delete *(d_list+5);
+    delete *(d_list+6);
+    delete *(d_list+7);
+    delete *(d_list+8);
+    delete *(d_list+9);
+    delete *(d_list+10);
+    delete *(d_list+11);
+    delete *(d_list+12);
+    delete *(d_list+13);
     delete *d_world;
     delete *d_camera;
 }
 
+int load_mesh() {
+    // Initialize Loader
+	objl::Loader Loader;
+
+	// Load .obj File
+	bool loadout = Loader.LoadFile("/home/kenny/Documents/Projects/cuda-rt/meshes/obj/box_stack.obj");
+
+	// Check to see if it loaded
+    std::ofstream file("e1Out.txt");
+	// If so continue
+	if (loadout)
+	{
+        // Create/Open e1Out.txt
+
+		// Go through each loaded mesh and out its contents
+		for (int i = 0; i < Loader.LoadedMeshes.size(); i++)
+		{
+			// Copy one of the loaded meshes to be our current mesh
+			objl::Mesh curMesh = Loader.LoadedMeshes[i];
+
+			// Print Mesh Name
+			file << "Mesh " << i << ": " << curMesh.MeshName << "\n";
+
+			// Print Vertices
+			file << "Vertices:\n";
+
+			// Go through each vertex and print its number,
+			//  position, normal, and texture coordinate
+			for (int j = 0; j < curMesh.Vertices.size(); j++)
+			{
+				file << "V" << j << ": " <<
+					"P(" << curMesh.Vertices[j].Position.X << ", " << curMesh.Vertices[j].Position.Y << ", " << curMesh.Vertices[j].Position.Z << ") " <<
+					"N(" << curMesh.Vertices[j].Normal.X << ", " << curMesh.Vertices[j].Normal.Y << ", " << curMesh.Vertices[j].Normal.Z << ") " <<
+					"TC(" << curMesh.Vertices[j].TextureCoordinate.X << ", " << curMesh.Vertices[j].TextureCoordinate.Y << ")\n";
+			}
+
+			// Print Indices
+			file << "Indices:\n";
+
+			// Go through every 3rd index and print the
+			//	triangle that these indices represent
+			for (int j = 0; j < curMesh.Indices.size(); j += 3)
+			{
+				file << "T" << j / 3 << ": " << curMesh.Indices[j] << ", " << curMesh.Indices[j + 1] << ", " << curMesh.Indices[j + 2] << "\n";
+			}
+
+			// Print Material
+			file << "Material: " << curMesh.MeshMaterial.name << "\n";
+			file << "Ambient Color: " << curMesh.MeshMaterial.Ka.X << ", " << curMesh.MeshMaterial.Ka.Y << ", " << curMesh.MeshMaterial.Ka.Z << "\n";
+			file << "Diffuse Color: " << curMesh.MeshMaterial.Kd.X << ", " << curMesh.MeshMaterial.Kd.Y << ", " << curMesh.MeshMaterial.Kd.Z << "\n";
+			file << "Specular Color: " << curMesh.MeshMaterial.Ks.X << ", " << curMesh.MeshMaterial.Ks.Y << ", " << curMesh.MeshMaterial.Ks.Z << "\n";
+			file << "Specular Exponent: " << curMesh.MeshMaterial.Ns << "\n";
+			file << "Optical Density: " << curMesh.MeshMaterial.Ni << "\n";
+			file << "Dissolve: " << curMesh.MeshMaterial.d << "\n";
+			file << "Illumination: " << curMesh.MeshMaterial.illum << "\n";
+			file << "Ambient Texture Map: " << curMesh.MeshMaterial.map_Ka << "\n";
+			file << "Diffuse Texture Map: " << curMesh.MeshMaterial.map_Kd << "\n";
+			file << "Specular Texture Map: " << curMesh.MeshMaterial.map_Ks << "\n";
+			file << "Alpha Texture Map: " << curMesh.MeshMaterial.map_d << "\n";
+			file << "Bump Map: " << curMesh.MeshMaterial.map_bump << "\n";
+
+			// Leave a space to separate from the next mesh
+			file << "\n";
+		}
+
+		// Close File
+		file.close();
+	}
+	// If not output an error
+	else
+	{
+		// Output Error
+		std::cerr << "Failed to Load File. May have failed to find it or it was not an .obj file.\n";
+
+		// Close File
+		file.close();
+	}
+
+	// Exit the program
+	return 0;
+
+}
+
 int main() {
-    objl::Loader loader;
-    loader.LoadFile("../meshes/obj/bunny.obj");
+	// Load .obj File
+    // load_mesh();
     int nx = 1200;
     int ny = 600;
-    int ns = 10;
+    int ns = 50;
     int tx = 8;
     int ty = 8;
     int max_depth = 15;
@@ -159,7 +267,7 @@ int main() {
 
     // make our world of hitables & the camera
     hitable **d_list;
-    checkCudaErrors(cudaMalloc((void **)&d_list, 6*sizeof(hitable *)));
+    checkCudaErrors(cudaMalloc((void **)&d_list, 14*sizeof(hitable *)));
     hitable **d_world;
     checkCudaErrors(cudaMalloc((void **)&d_world, sizeof(hitable *)));
     camera **d_camera;

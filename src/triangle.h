@@ -33,7 +33,12 @@ __device__ bool triangle::hit(const ray& r, float t_min, float t_max, hit_record
     if (t <= t_max && t >= t_min && b1 >= 0. && b1 <= 1. && b2 >= 0. && b2 <= 1. && sub >= 0. && sub <= 1.) {
         rec.t = t;
         rec.p = r.at(rec.t);
-        rec.normal = unit_vector(sub * n + b1 * n + b2 * n);
+        if (dot(rec.p, n) > 0) {
+            rec.normal = -n;
+        }
+        else {
+            rec.normal = n;
+        }
         rec.BSDF = BSDF;
         return true;
     }

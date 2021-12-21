@@ -146,4 +146,26 @@ __host__ __device__ inline vec3 reflect(vec3 wo, vec3 n) {
     return wo - 2.f * dot(wo, n) * n;
 }
 
+__host__ __device__ bool refract(const vec3& wo, vec3* wi, float ior) {
+    // vec3 n = vec3(0, 0, 1);
+    // float eta = ior / 1.;
+    // if (wo.z() * n > 0) {
+    //     eta = 1. / ior;
+    // }
+    // float cos_theta_prime_sq = 1 - pow(eta, 2) * (1 - wo.z() * wo.z());
+    // if (cos_theta_prime_sq < 0) {
+    //     return false;
+    // }
+    // float cos_theta_prime = sqrt(cos_theta_prime_sq);
+    // wi->x = -eta * wo.x;
+    // wi->y = -eta * wo.y;
+    // if (wo.z < 0) {
+    //     wi->z = abs(cos_theta_prime);
+    // }
+    // else {
+    //     wi->z = -abs(cos_theta_prime);
+    // }
+  return true;
+}
+
 #endif
