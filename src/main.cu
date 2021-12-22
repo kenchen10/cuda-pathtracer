@@ -108,7 +108,7 @@ __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_cam
     diffuse *p = new diffuse(vec3(1.f, 0.f, 1.f) * 2.);
     // Image
     auto aspect_ratio = 16.0 / 9.0;
-    int image_width = 400;
+    int image_width = 1900;
     vec3 lookfrom(0,0,5);
     vec3 lookat(0,0,0);
     vec3 vup(0,1,0);
@@ -247,8 +247,8 @@ int main() {
     int nx = 1200;
     int ny = 600;
     int ns = 50;
-    int tx = 8;
-    int ty = 8;
+    int tx = 16;
+    int ty = 16;
     int max_depth = 15;
 
     std::cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";
