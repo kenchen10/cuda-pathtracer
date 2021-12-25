@@ -1,0 +1,1 @@
+cuda-memcheck ./exec.sh |more
