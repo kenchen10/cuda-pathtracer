@@ -33,6 +33,7 @@ public:
     __host__ __device__ inline float length() const { return sqrt(e[0]*e[0] + e[1]*e[1] + e[2]*e[2]); }
     __host__ __device__ inline float squared_length() const { return e[0]*e[0] + e[1]*e[1] + e[2]*e[2]; }
     __host__ __device__ inline void make_unit_vector();
+    __host__ __device__ inline void print() const { std::cerr << "x: " << e[0] << " y: " << e[1] << " z: " << e[2] << "\n"; }
 
 
     float e[3];

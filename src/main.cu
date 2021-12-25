@@ -50,7 +50,7 @@ __device__ vec3 global_illumination(const ray& r, hitable **world, curandState *
                     return vec3(0., 0., 0.);
                 }
                 vec3 unit_direction = unit_vector(cur_ray.direction());
-                point_light pt_l = point_light(vec3(1., 1., 1.), vec3(0., 0, 10));
+                point_light pt_l = point_light(vec3(1., 1., 1.), vec3(0., 0, 2));
                 vec3 light_dir;
                 double light_dist;
                 double pdf;
@@ -109,30 +109,30 @@ __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_cam
     // Image
     auto aspect_ratio = 16.0 / 9.0;
     int image_width = 1900;
-    vec3 lookfrom(0,0,20);
+    vec3 lookfrom(0,0,10);
     vec3 lookat(0,0,0);
     vec3 vup(0,1,0);
     auto dist_to_focus = 10.0;
     auto aperture = 0.1;
     int image_height = static_cast<int>(image_width / aspect_ratio);
     if (threadIdx.x == 0 && blockIdx.x == 0) {
-        *(d_list+0)   = new sphere(vec3(0,-.6,-.5), 0.3, m);
-        *(d_list+1) = new sphere(vec3(0,0,-.5), 0.1, green);
-        *(d_list+2) = new sphere(vec3(.5,-.6,-.5), 0.2, p);
-        *(d_list+3) = new sphere(vec3(-.6,-.6,-.5), 0.23, red);
-        *(d_list+4) = new triangle(vec3(-1,-1,-3), vec3(-1, 1, -3), vec3(1, 1, -3), white);
-        *(d_list+5) = new triangle(vec3(1, 1, -3), vec3(-1,-1,-3), vec3(1, -1, -3), white);
-        *(d_list+6) = new triangle(vec3(-1,-1,-3), vec3(1, -1, -3), vec3(1, -1, 0), white);
-        *(d_list+7) = new triangle(vec3(-1,-1,-3), vec3(-1, -1, 0), vec3(1, -1, 0), white);
-        *(d_list+8) = new triangle(vec3(-1,-1,-3), vec3(-1, 1, -3), vec3(-1, 1, 0), white);
-        *(d_list+9) = new triangle(vec3(-1,-1,-3), vec3(-1, -1, 0), vec3(-1, 1, 0), white);
-        *(d_list+10) = new triangle(vec3(1,-1,-3), vec3(1, 1, -3), vec3(1, 1, 0), white);
-        *(d_list+11) = new triangle(vec3(1,-1,-3), vec3(1, -1, 0), vec3(1, 1, 0), white);
-        *(d_list+12) = new triangle(vec3(-1,1,-3), vec3(1, 1, -3), vec3(1, 1, 0), white);
-        *(d_list+13) = new triangle(vec3(-1,1,-3), vec3(-1, 1, 0), vec3(1, 1, 0), white);
-        for (int i = 0; i < 30; i++)
+        // *(d_list+0)   = new sphere(vec3(0,-.6,-.5), 0.3, m);
+        // *(d_list+1) = new sphere(vec3(0,0,-.5), 0.1, green);
+        // *(d_list+2) = new sphere(vec3(.5,-.6,-.5), 0.2, p);
+        // *(d_list+3) = new sphere(vec3(-.6,-.6,-.5), 0.23, red);
+        // *(d_list+4) = new triangle(vec3(-1,-1,-3), vec3(-1, 1, -3), vec3(1, 1, -3), white);
+        // *(d_list+5) = new triangle(vec3(1, 1, -3), vec3(-1,-1,-3), vec3(1, -1, -3), white);
+        // *(d_list+6) = new triangle(vec3(-1,-1,-3), vec3(1, -1, -3), vec3(1, -1, 0), white);
+        // *(d_list+7) = new triangle(vec3(-1,-1,-3), vec3(-1, -1, 0), vec3(1, -1, 0), white);
+        // *(d_list+8) = new triangle(vec3(-1,-1,-3), vec3(-1, 1, -3), vec3(-1, 1, 0), white);
+        // *(d_list+9) = new triangle(vec3(-1,-1,-3), vec3(-1, -1, 0), vec3(-1, 1, 0), white);
+        // *(d_list+10) = new triangle(vec3(1,-1,-3), vec3(1, 1, -3), vec3(1, 1, 0), white);
+        // *(d_list+11) = new triangle(vec3(1,-1,-3), vec3(1, -1, 0), vec3(1, 1, 0), white);
+        // *(d_list+12) = new triangle(vec3(-1,1,-3), vec3(1, 1, -3), vec3(1, 1, 0), white);
+        // *(d_list+13) = new triangle(vec3(-1,1,-3), vec3(-1, 1, 0), vec3(1, 1, 0), white);
+        for (int i = 0; i < 4000; i++)
         {
-            *(d_list+14+i) = new triangle(vec_list[3*i], vec_list[3*i+1], vec_list[3*i+2], yellow);
+            *(d_list+i) = new triangle(vec_list[3*i], vec_list[3*i+1], vec_list[3*i+2], yellow);
         }
         // *(d_list+14) = new triangle(vec_list[0], vec_list[1], vec_list[2], yellow);
         // *(d_list+15) = new triangle(vec_list[3], vec_list[4], vec_list[5], yellow);
@@ -171,11 +171,11 @@ int main() {
     // load_mesh();
     int nx = 1200;
     int ny = 600;
-    int ns = 50;
+    int ns = 10;
     int tx = 16;
     int ty = 16;
-    int max_depth = 15;
-    int num_prims = 39;
+    int max_depth = 2;
+    int num_prims = 0 + 4000;
 
     std::cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";
     std::cerr << "in " << tx << "x" << ty << " blocks.\n";
@@ -196,7 +196,7 @@ int main() {
     checkCudaErrors(cudaMallocManaged((void **)&vec_list, 108*sizeof(vec3)));
     objl::Loader Loader;
 	// Load .obj File
-	bool loadout = Loader.LoadFile("/home/kenny/Documents/Projects/cuda-rt/meshes/obj/box_stack.obj");
+	bool loadout = Loader.LoadFile("/home/kenny/Documents/Projects/cuda-rt/meshes/obj/bunny.obj");
 
 	// Check to see if it loaded
     int count = 0;
@@ -204,24 +204,30 @@ int main() {
 	if (loadout)
 	{
         // Create/Open e1Out.txt
-
+        std::cerr << Loader.LoadedMeshes.size() << "\n";
 		// Go through each loaded mesh and out its contents
 		for (int i = 0; i < Loader.LoadedMeshes.size(); i++)
 		{
 			// Copy one of the loaded meshes to be our current mesh
 			objl::Mesh curMesh = Loader.LoadedMeshes[i];
+            std::cerr << curMesh.Indices.size() << "\n";
             for (int j = 0; j < curMesh.Indices.size(); j += 3)
 			{
 				int i1 = curMesh.Indices[j];
                 int i2 = curMesh.Indices[j + 1];
                 int i3 = curMesh.Indices[j + 2];
-                std::cerr << i1 << " " << i2 << " " << i3 << "\n";
+                // std::cerr << i1 << " " << i2 << " " << i3 << "\n";
                 vec_list[count] = vec3(curMesh.Vertices[i1].Position.X, curMesh.Vertices[i1].Position.Y, curMesh.Vertices[i1].Position.Z);
                 vec_list[count + 1] = vec3(curMesh.Vertices[i2].Position.X, curMesh.Vertices[i2].Position.Y, curMesh.Vertices[i2].Position.Z);
                 vec_list[count + 2] = vec3(curMesh.Vertices[i3].Position.X, curMesh.Vertices[i3].Position.Y, curMesh.Vertices[i3].Position.Z);
                 count += 3;
+                // vec_list[count].print();
+                // vec_list[count+1].print();
+                // vec_list[count+2].print();
 			}
         }
+
+        std::cerr << count << "\n";
     }
 
     // make our world of hitables & the camera
