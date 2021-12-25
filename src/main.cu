@@ -130,7 +130,7 @@ __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_cam
         *(d_list+11) = new triangle(vec3(1,-1,-3), vec3(1, -1, 0), vec3(1, 1, 0), white);
         *(d_list+12) = new triangle(vec3(-1,1,-3), vec3(1, 1, -3), vec3(1, 1, 0), white);
         *(d_list+13) = new triangle(vec3(-1,1,-3), vec3(-1, 1, 0), vec3(1, 1, 0), white);
-        for (int i = 0; i < 25; i++)
+        for (int i = 0; i < 30; i++)
         {
             *(d_list+14+i) = new triangle(vec_list[3*i], vec_list[3*i+1], vec_list[3*i+2], yellow);
         }
@@ -231,7 +231,7 @@ int main() {
     checkCudaErrors(cudaMalloc((void **)&d_world, sizeof(hitable *)));
     camera **d_camera;
     checkCudaErrors(cudaMalloc((void **)&d_camera, sizeof(camera *)));
-    print(vec_list[0]);print(vec_list[1]);print(vec_list[2]);
+    // print(vec_list[0]);print(vec_list[1]);print(vec_list[2]);
     create_world<<<1,1>>>(d_list,d_world,d_camera,vec_list,num_prims);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());

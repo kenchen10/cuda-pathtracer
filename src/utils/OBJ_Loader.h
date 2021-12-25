@@ -471,13 +471,13 @@ namespace objl
 				{
 					if (!meshname.empty())
 					{
-						std::cout
-							<< "\r- " << meshname
-							<< "\t| vertices > " << Positions.size()
-							<< "\t| texcoords > " << TCoords.size()
-							<< "\t| normals > " << Normals.size()
-							<< "\t| triangles > " << (Vertices.size() / 3)
-							<< (!MeshMatNames.empty() ? "\t| material: " + MeshMatNames.back() : "");
+						// std::cout
+						// 	<< "\r- " << meshname
+						// 	<< "\t| vertices > " << Positions.size()
+						// 	<< "\t| texcoords > " << TCoords.size()
+						// 	<< "\t| normals > " << Normals.size()
+						// 	<< "\t| triangles > " << (Vertices.size() / 3)
+						// 	<< (!MeshMatNames.empty() ? "\t| material: " + MeshMatNames.back() : "");
 					}
 				}
 				#endif
@@ -531,7 +531,7 @@ namespace objl
 						}
 					}
 					#ifdef OBJL_CONSOLE_OUTPUT
-					std::cout << std::endl;
+					// std::cout << std::endl;
 					outputIndicator = 0;
 					#endif
 				}
@@ -659,7 +659,7 @@ namespace objl
 					pathtomat += algorithm::tail(curline);
 
 					#ifdef OBJL_CONSOLE_OUTPUT
-					std::cout << std::endl << "- find materials in: " << pathtomat << std::endl;
+					// std::cout << std::endl << "- find materials in: " << pathtomat << std::endl;
 					#endif
 
 					// Load Materials
@@ -668,7 +668,7 @@ namespace objl
 			}
 
 			#ifdef OBJL_CONSOLE_OUTPUT
-			std::cout << std::endl;
+			// std::cout << std::endl;
 			#endif
 
 			// Deal with last mesh
