@@ -35,7 +35,8 @@ __device__ vec3 global_illumination(const ray& r, hitable **world, curandState *
    unit_sphere_sampler sampler;
    vec3 reflectance = vec3(1., 1., 1.);
    vec3 f = reflectance / CUDART_PI_F;
-   point_light pt_l = point_light(vec3(1., 1., 1.), vec3(0, 0, 3));
+   point_light pt_l = point_light(vec3(1., 1., 1.), vec3(10., 1., -5.));
+   vec3 L = vec3(0, 0, 0);
    for(int i = 0; i < r.depth; i++) {
       hit_record rec;
       if ((*world)->hit(cur_ray, 0.001f, FLT_MAX, rec)) {
@@ -55,13 +56,13 @@ __device__ vec3 global_illumination(const ray& r, hitable **world, curandState *
                 double light_dist;
                 double pdf;
                 vec3 wi;
-                vec3 light_radiance = pt_l.sample_light(rec.p, &light_dir, &light_dist, &pdf);
+                vec3 light_radiance = pt_l.sample_light(unit_vector(rec.p), &light_dir, &light_dist, &pdf);
                 ray shadow_ray = ray(rec.p, light_dir);
-                // if (!(*world)->hit(shadow_ray, 0.001f, FLT_MAX, rec)) {
-                //     double cos = abs(light_dir.z());
-                //     return cur_attenuation * light_radiance;
-                // }
-                return cur_attenuation;
+                if (!(*world)->hit(shadow_ray, 0.001f, FLT_MAX, rec)) {
+                    double cos = abs(light_dir.z());
+                    return cur_attenuation * light_radiance;
+                }
+                // return cur_attenuation;
             }
             else {
                 return vec3(0., 0., 0.);
@@ -110,31 +111,31 @@ __global__ void create_world(hitable **d_list, hitable **d_world, camera **d_cam
     // Image
     auto aspect_ratio = 16.0 / 9.0;
     int image_width = 1900;
-    vec3 lookfrom(0,0,-20);
+    vec3 lookfrom(0,1,5);
     vec3 lookat(0,0,0);
     vec3 vup(0,1,0);
     auto dist_to_focus = 10.0;
     auto aperture = 0.1;
     int image_height = static_cast<int>(image_width / aspect_ratio);
     if (threadIdx.x == 0 && blockIdx.x == 0) {
-        // *(d_list+0)   = new sphere(vec3(0,-.6,-.5), 0.3, m);
-        // *(d_list+1) = new sphere(vec3(0,0,-.5), 0.1, green);
-        // *(d_list+2) = new sphere(vec3(.5,-.6,-.5), 0.2, p);
-        // *(d_list+3) = new sphere(vec3(-.6,-.6,-.5), 0.23, red);
+        *(d_list+0)   = new sphere(vec3(0,-.2,-.5), 0.3, m);
+        *(d_list+1) = new sphere(vec3(-.3,-.4,-.2), 0.1, green);
+        *(d_list+2) = new sphere(vec3(.5,-.3,-.5), 0.2, p);
+        *(d_list+3) = new sphere(vec3(-.6,-.27,-.5), 0.23, red);
         // *(d_list+4) = new triangle(vec3(-1,-1,-3), vec3(-1, 1, -3), vec3(1, 1, -3), white);
         // *(d_list+5) = new triangle(vec3(1, 1, -3), vec3(-1,-1,-3), vec3(1, -1, -3), white);
-        // *(d_list+6) = new triangle(vec3(-1,-1,-3), vec3(1, -1, -3), vec3(1, -1, 0), white);
-        // *(d_list+7) = new triangle(vec3(-1,-1,-3), vec3(-1, -1, 0), vec3(1, -1, 0), white);
+        *(d_list+4) = new triangle(vec3(-5,-.5,-3), vec3(5, -.5, -3), vec3(5, -.5, 0), white);
+        *(d_list+5) = new triangle(vec3(-5,-.5,-3), vec3(-5, -.5, 0), vec3(5, -.5, 0), white);
         // *(d_list+8) = new triangle(vec3(-1,-1,-3), vec3(-1, 1, -3), vec3(-1, 1, 0), white);
         // *(d_list+9) = new triangle(vec3(-1,-1,-3), vec3(-1, -1, 0), vec3(-1, 1, 0), white);
         // *(d_list+10) = new triangle(vec3(1,-1,-3), vec3(1, 1, -3), vec3(1, 1, 0), white);
         // *(d_list+11) = new triangle(vec3(1,-1,-3), vec3(1, -1, 0), vec3(1, 1, 0), white);
         // *(d_list+12) = new triangle(vec3(-1,1,-3), vec3(1, 1, -3), vec3(1, 1, 0), white);
         // *(d_list+13) = new triangle(vec3(-1,1,-3), vec3(-1, 1, 0), vec3(1, 1, 0), white);
-        for (int i = 0; i < num_prims; i++)
-        {
-            *(d_list+i) = new triangle(vec_list[3*i], vec_list[3*i+1], vec_list[3*i+2], yellow);
-        }
+        // for (int i = 0; i < num_prims; i++)
+        // {
+        //     *(d_list+i) = new triangle(vec_list[3*i], vec_list[3*i+1], vec_list[3*i+2], yellow);
+        // }
         // *(d_list+14) = new triangle(vec_list[0], vec_list[1], vec_list[2], yellow);
         // *(d_list+15) = new triangle(vec_list[3], vec_list[4], vec_list[5], yellow);
         // *(d_list+16) = new triangle(vec_list[6], vec_list[7], vec_list[8], yellow);
@@ -169,10 +170,10 @@ int find_num_prims(objl::Loader Loader) {
 int main() {
     int nx = 1200;
     int ny = 600;
-    int ns = 30;
+    int ns = 500;
     int tx = 16;
     int ty = 16;
-    int max_depth = 3;
+    int max_depth = 10;
 
     std::cerr << "Rendering a " << nx << "x" << ny << " image with " << ns << " samples per pixel ";
     std::cerr << "in " << tx << "x" << ty << " blocks.\n";
@@ -196,11 +197,11 @@ int main() {
 
 	// Check to see if it loaded
     int count = 0;
-    int num_prims;
+    int num_prims = 6;
 	// If so continue
 	if (loadout)
 	{
-        num_prims = find_num_prims(Loader);
+        // num_prims = find_num_prims(Loader);
         std::cerr << "Loading " << num_prims << " triangles." << "\n";
         checkCudaErrors(cudaMallocManaged((void **)&vec_list, num_prims*3*sizeof(vec3)));
         // Create/Open e1Out.txt

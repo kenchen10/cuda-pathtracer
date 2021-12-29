@@ -33,7 +33,6 @@ public:
     __host__ __device__ inline float length() const { return sqrt(e[0]*e[0] + e[1]*e[1] + e[2]*e[2]); }
     __host__ __device__ inline float squared_length() const { return e[0]*e[0] + e[1]*e[1] + e[2]*e[2]; }
     __host__ __device__ inline void make_unit_vector();
-    __host__ __device__ inline void print() const { std::cerr << "x: " << e[0] << " y: " << e[1] << " z: " << e[2] << "\n"; }
 
 
     float e[3];
@@ -151,26 +150,12 @@ __host__ __device__ inline vec3 reflect(vec3 wo, vec3 n) {
     return wo - 2.f * dot(wo, n) * n;
 }
 
-__host__ __device__ bool refract(const vec3& wo, vec3* wi, float ior) {
-    // vec3 n = vec3(0, 0, 1);
-    // float eta = ior / 1.;
-    // if (wo.z() * n > 0) {
-    //     eta = 1. / ior;
-    // }
-    // float cos_theta_prime_sq = 1 - pow(eta, 2) * (1 - wo.z() * wo.z());
-    // if (cos_theta_prime_sq < 0) {
-    //     return false;
-    // }
-    // float cos_theta_prime = sqrt(cos_theta_prime_sq);
-    // wi->x = -eta * wo.x;
-    // wi->y = -eta * wo.y;
-    // if (wo.z < 0) {
-    //     wi->z = abs(cos_theta_prime);
-    // }
-    // else {
-    //     wi->z = -abs(cos_theta_prime);
-    // }
-  return true;
+__host__ __device__ vec3 refract(const vec3& wo, const vec3 n, float ior) {
+    vec3 uv = unit_vector(wo);
+    auto cos_theta = min(dot(-uv, n), 1.0);
+    vec3 r_out_perp =  ior * (uv + cos_theta*n);
+    vec3 r_out_parallel = -sqrt(fabs(1.0 - r_out_perp.squared_length())) * n;
+    return r_out_perp + r_out_parallel;
 }
 
 #endif

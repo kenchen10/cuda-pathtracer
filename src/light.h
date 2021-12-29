@@ -23,8 +23,8 @@ class point_light : light {
 };
 
 __device__ vec3 point_light::sample_light(const vec3 p, vec3* wi, double* d, double* pdf) {
-    vec3 dir = pos - p;
-    *wi = unit_vector(dir);
+    vec3 dir = unit_vector(pos) - p;
+    *wi = dir;
     *d = dir.length();
     *pdf = 1.0;
     return radiance;
