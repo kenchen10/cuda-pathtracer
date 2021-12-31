@@ -6,8 +6,9 @@ class bsdf {
     public:
         __device__ virtual vec3 f(const vec3 wo, const vec3 wi) = 0;
         __device__ virtual vec3 evaluate(const vec3 wo, vec3 *wi, vec3 p, vec3 n, double *pdf, curandState *local_rand_state) = 0;
-        __device__ virtual vec3 emission(vec3 wo) const = 0;
+        __device__ virtual vec3 emission(vec3 wo, vec3 n) const = 0;
         __device__ virtual bool reflective() const = 0;
+        __device__ virtual bool is_light() const = 0;
 };
 
 class diffuse : public bsdf {
@@ -15,12 +16,13 @@ class diffuse : public bsdf {
         __device__ diffuse(const vec3 r): attenuation(r) {}
         __device__ virtual vec3 f(const vec3 wo, const vec3 wi);
         __device__ virtual vec3 evaluate(const vec3 wo, vec3 *wi, vec3 p, vec3 n, double *pdf, curandState *local_rand_state);
-        __device__ virtual vec3 emission(vec3 wo) const { return vec3(0.f, 0.f, 0.f); };
+        __device__ virtual vec3 emission(vec3 wo, vec3 n) const { return vec3(0.f, 0.f, 0.f); };
         __device__ virtual bool reflective() const { return false; };
+        __device__ virtual bool is_light() const { return false; };
     
     private:
         vec3 attenuation;
-        unit_sphere_sampler sampler;
+        cosing_weighted_sampler sampler;
 };
 
 __device__ vec3 diffuse::f(const vec3 wo, const vec3 wi) {
@@ -28,8 +30,16 @@ __device__ vec3 diffuse::f(const vec3 wo, const vec3 wi) {
 }
 
 __device__ vec3 diffuse::evaluate(const vec3 wo, vec3 *wi, vec3 p, vec3 n, double *pdf, curandState *local_rand_state) {
-    *wi = unit_vector(p + n + sampler.get_sample(local_rand_state));
-    *pdf = CUDART_PI_F;
+    float r1 = 2 * M_PI * curand_uniform(local_rand_state);
+    float r2 = curand_uniform(local_rand_state);
+    float r2s = sqrtf(r2);
+
+    // compute orthonormal coordinate frame uvw with hitpoint as origin 
+    vec3 w = n;
+    vec3 u = unit_vector(cross((fabs(w.x()) > .1 ? vec3(0, 1, 0) : vec3(1, 0, 0)), w));
+    vec3 v = cross(w, u);
+    *wi = unit_vector(u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrtf(1 - r2));
+    *pdf = sqrt(1-r1) / CUDART_PI_F;
     return f(wo, *wi);
 }
 
@@ -38,8 +48,9 @@ class mirror : public bsdf {
         __device__ mirror(const vec3 r): attenuation(r) {}
         __device__ virtual vec3 f(const vec3 wo, const vec3 wi);
         __device__ virtual vec3 evaluate(const vec3 wo, vec3 *wi, vec3 p, vec3 n, double *pdf, curandState *local_rand_state);
-        __device__ virtual vec3 emission(vec3 wo) const { return vec3(0.f, 0.f, 0.f); };
+        __device__ virtual vec3 emission(vec3 wo, vec3 n) const { return vec3(0.f, 0.f, 0.f); };
         __device__ virtual bool reflective() const { return true; };
+        __device__ virtual bool is_light() const { return false; };
     
     private:
         vec3 attenuation;
@@ -61,8 +72,9 @@ class glass : public bsdf {
         __device__ glass(const vec3 t, const vec3 r, double rough, double ior): transmittance(t), attenuation(r), roughness(rough), ior(ior) {}
         __device__ virtual vec3 f(const vec3 wo, const vec3 wi);
         __device__ virtual vec3 evaluate(const vec3 wo, vec3 *wi, vec3 p, vec3 n, double *pdf, curandState *local_rand_state);
-        __device__ virtual vec3 emission(vec3 wo) const { return vec3(0.f, 0.f, 0.f); };
+        __device__ virtual vec3 emission(vec3 wo, vec3 n) const { return vec3(0.f, 0.f, 0.f); };
         __device__ virtual bool reflective() const { return true; };
+        __device__ virtual bool is_light() const { return false; };
     
     private:
         vec3 attenuation;
@@ -104,13 +116,12 @@ class emissive : public bsdf {
         __device__ emissive(const vec3 r, const vec3 p): attenuation(r), pos(p) {}
         __device__ virtual vec3 f(const vec3 wo, const vec3 wi);
         __device__ virtual vec3 evaluate(const vec3 wo, vec3 *wi, vec3 p, vec3 n, double *pdf, curandState *local_rand_state);
-        __device__ virtual vec3 emission(vec3 wo) const { 
-            if (dot(pos, wo) > 0.) {
-                printf("%f", dot(pos, wo));
-            }
-            return attenuation * max(0.0, dot(pos, wo)); 
+        __device__ virtual vec3 emission(vec3 wo, vec3 n) const { 
+
+            return attenuation; 
         };
         __device__ virtual bool reflective() const { return true; };
+        __device__ virtual bool is_light() const { return true; };
     
     private:
         vec3 attenuation;
